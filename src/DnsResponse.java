@@ -1,51 +1,51 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/**
+ *
+ * @author jcuel
+ */
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 
 public class DnsResponse{
     private byte[] response;
-    private byte[] ID;
-    private boolean QR, AA, TC, RD, RA;
-    private int RCode, QDCount, ANCount, NSCount, ARCount;
+    private boolean AA;
+    private int ANCount, NSCount, ARCount;
     private DNSRecord[] answerRecords;
     private DNSRecord[] nameServerRecords;
     private DNSRecord[] additionalRecords;
     private QueryType queryType;
-    private boolean noRecords = false;
 
-	public DnsResponse(byte[] response, int requestSize, QueryType queryType) {
-		this.response = response;
-		this.queryType = queryType;
+    public DnsResponse(byte[] response, int requestSize, QueryType queryType) {
+        this.response = response;
+        this.queryType = queryType;
 
-        this.validateResponseQuestionType();
         this.parseHeader();
-        
+
         answerRecords = new DNSRecord[ANCount];
         int offSet = requestSize;
         for(int i = 0; i < ANCount; i ++){
-        	answerRecords[i] = this.parseAnswer(offSet);
-        	offSet += answerRecords[i].getByteLength();
+            answerRecords[i] = this.parseAnswer(offSet);
+            offSet += answerRecords[i].getByteLength();
         }
-        
-        //ns count even though we don't do anything
+
+        //ns count
         nameServerRecords=  new DNSRecord[NSCount];
         for(int i = 0; i < NSCount; i++){
             nameServerRecords[i] = this.parseAnswer(offSet);
             offSet += nameServerRecords[i].getByteLength();
         }
-        
+
         additionalRecords = new DNSRecord[ARCount];
         for(int i = 0; i < ARCount; i++){
-        	additionalRecords[i] = this.parseAnswer(offSet);
-        	offSet += additionalRecords[i].getByteLength();
+                additionalRecords[i] = this.parseAnswer(offSet);
+                offSet += additionalRecords[i].getByteLength();
         }
-        try {
-            this.checkRCodeForErrors();
-        } catch(MissingDomainException e){
-        	noRecords = true;
-        }
-        
-        this.validateQueryTypeIsResponse();
     }
 
     public AnswersAndIP outputResponse() {
@@ -77,57 +77,13 @@ public class DnsResponse{
         return aaip;
     }
 	
-	private void checkRCodeForErrors() {
-	    switch( this.RCode) {
-            case 0:
-                //No error
-                break;
-            case 1:
-                throw new RuntimeException("Format error: the name server was unable to interpret the query");
-            case 2:
-                throw new RuntimeException("Server failure: the name server was unable to process this query due to a problem with the name server");
-            case 3:
-                throw new MissingDomainException();
-            case 4:
-                throw new RuntimeException("Not implemented: the name server does not support the requested kind of query");
-            case 5:
-                throw new RuntimeException("Refused: the name server refuses to perform the requested operation for policy reasons");
-        }
-    }
-
     private void parseHeader(){
-        //ID
-        byte[] ID = new byte[2];
-        ID[0] = response[0];
-        ID[1] = response[1];
-        this.ID = ID;
-
-        //QR
-        this.QR = getBit(response[2], 7) == 1;
-
         //AA
         this.AA = getBit(response[2], 2) == 1;
 
-        //TC
-        this.TC = getBit(response[2], 1) == 1;
-
-        //RD
-        this.RD = getBit(response[2], 0) == 1;
-
-        //RA
-        this.RA = getBit(response[3], 7) == 1;
-
-        //RCODE
-        this.RCode = response[3] & 0x0F;
-
-        //QDCount
-        byte[] QDCount = { response[4], response[5] };
-        ByteBuffer wrapped = ByteBuffer.wrap(QDCount);
-        this.QDCount = wrapped.getShort();
-
         //ANCount
         byte[] ANCount = { response[6], response[7] };
-        wrapped = ByteBuffer.wrap(ANCount);
+        ByteBuffer wrapped = ByteBuffer.wrap(ANCount);
         this.ANCount = wrapped.getShort();
 
         //NSCount
@@ -213,30 +169,10 @@ public class DnsResponse{
     }
 
     private String parseNSTypeRDATA(int rdLength, int countByte) {
-		rDataEntry result = getDomainFromIndex(countByte);
-		String nameServer = result.getDomain();
+        rDataEntry result = getDomainFromIndex(countByte);
+        String nameServer = result.getDomain();
     	
     	return nameServer;
-    }
-
-    private void validateQueryTypeIsResponse(){
-        if (!this.QR) {
-            throw new RuntimeException("ERROR\tInvalid response from server: Message is not a response");
-        }
-    }
-
-    private void validateResponseQuestionType() {
-        //Question starts at byte 13 (indexed at 11)
-        int index = 12;
-
-        while (this.response[index] != 0) {
-            index++;
-        }
-        byte[] qType = {this.response[index + 1], this.response[index + 2]};
-
-        if (this.getQTYPEFromByteArray(qType) != this.queryType) {
-            throw new RuntimeException("ERROR\tResponse query type does not match request query type");
-        }
     }
 
     private rDataEntry getDomainFromIndex(int index){
@@ -246,25 +182,25 @@ public class DnsResponse{
     	boolean start = true;
     	int count = 0;
     	while(wordSize != 0){
-			if (!start){
-				domain += ".";
-			}
-	    	if ((wordSize & 0xC0) == (int) 0xC0) {
-	    		byte[] offset = { (byte) (response[index] & 0x3F), response[index + 1] };
-	            ByteBuffer wrapped = ByteBuffer.wrap(offset);
-	            domain += getDomainFromIndex(wrapped.getShort()).getDomain();
-	            index += 2;
-	            count +=2;
-	            wordSize = 0;
-	    	}else{
-	    		domain += getWordFromIndex(index);
-	    		index += wordSize + 1;
-	    		count += wordSize + 1;
-	    		wordSize = response[index];
-	    	}
-            start = false;
-            
+            if (!start){
+                domain += ".";
+            }
+            if ((wordSize & 0xC0) == (int) 0xC0) {
+                byte[] offset = { (byte) (response[index] & 0x3F), response[index + 1] };
+                ByteBuffer wrapped = ByteBuffer.wrap(offset);
+                domain += getDomainFromIndex(wrapped.getShort()).getDomain();
+                index += 2;
+                count +=2;
+                wordSize = 0;
+            }else{
+                domain += getWordFromIndex(index);
+                index += wordSize + 1;
+                count += wordSize + 1;
+                wordSize = response[index];
+            }
+            start = false; 
     	}
+        
     	result.setDomain(domain);
     	result.setBytes(count);
     	return result;
@@ -273,8 +209,8 @@ public class DnsResponse{
     	String word = "";
     	int wordSize = response[index];
     	for(int i =0; i < wordSize; i++){
-    		word += (char) response[index + i + 1];
-		}
+            word += (char) response[index + i + 1];
+        }
     	return word;
     }
 

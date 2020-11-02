@@ -1,22 +1,30 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/**
+ *
+ * @author jcuel
+ */
 import java.net.*;
 
 public class DnsClient {
 
     public QueryType queryType = QueryType.A;
-    public int MAX_DNS_PACKET_SIZE = 512;
     private byte[] server = new byte[4];
     private String name;
     private int port = 53;
 
     public DnsClient(String args[]) {
         try {
-            this.parseInputArguments(args);
+            this.parseServer(args);
         } catch (Exception e) {
             e.printStackTrace();
-            throw new IllegalArgumentException("ERROR\tIncorrect input syntax: Please check arguments and try again.");
         }
         if (server == null || name == null) {
-            throw new IllegalArgumentException("ERROR\tIncorrect input syntax: Server IP and domain name must be provided.");
+            throw new IllegalArgumentException("Server IP and domain name must be provided.");
         }
     }
 
@@ -36,19 +44,18 @@ public class DnsClient {
             DatagramPacket requestPacket = new DatagramPacket(requestBytes, requestBytes.length, inetaddress, port);
             DatagramPacket responsePacket = new DatagramPacket(responseBytes, responseBytes.length);
 
-            //Send packet and time response
+            //Send packet
             socket.send(requestPacket);
             socket.receive(responsePacket);
             socket.close();
          
             DnsResponse response = new DnsResponse(responsePacket.getData(), requestBytes.length, queryType);
             
-            
             AnswersAndIP aaip = response.outputResponse();
             if (aaip.answers == 0){
                 System.out.println("----------------------------------------------------------------");
                 String[] name_and_ip = {name, aaip.IP};
-                parseInputArguments(name_and_ip);
+                parseServer(name_and_ip);
                 makeRequest(aaip.IP);
             }
             else {
@@ -63,13 +70,13 @@ public class DnsClient {
         }
     }
 
-    private void parseInputArguments(String args[]) {
+    private void parseServer(String args[]) {
         name = args[0];
         String[] addressComponents = args[1].split("\\.");
         for (int i = 0; i < addressComponents.length; i++) {
             int ipValue = Integer.parseInt(addressComponents[i]);
             if (ipValue < 0 || ipValue > 255) {
-                throw new NumberFormatException("ERROR\tIncorrect input syntax: IP Address numbers must be between 0 and 255, inclusive.");
+                throw new NumberFormatException();
             }
             server[i] = (byte) ipValue;
         }
