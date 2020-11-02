@@ -48,8 +48,9 @@ public class DnsResponse{
         this.validateQueryTypeIsResponse();
     }
 
-    public void outputResponse() {
-        System.out.println();
+    public AnswersAndIP outputResponse() {
+        AnswersAndIP aaip = new AnswersAndIP(ANCount, "");
+        
         System.out.println("Reply received. Content overview:");
         System.out.println("\t" + ANCount + " Answers.");
         System.out.println("\t" + NSCount + " Intermediate Name Servers");
@@ -67,8 +68,13 @@ public class DnsResponse{
 
         System.out.println("Additional Information Section:");
         for (DNSRecord record : additionalRecords){
+            if (aaip.IP.equals("")){
+                aaip.IP = record.getDomain();
+            }
             record.outputRecord();
         }
+        
+        return aaip;
     }
 	
 	private void checkRCodeForErrors() {

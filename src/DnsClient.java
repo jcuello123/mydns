@@ -4,10 +4,7 @@ public class DnsClient {
 
     public QueryType queryType = QueryType.A;
     public int MAX_DNS_PACKET_SIZE = 512;
-    private int timeout = 5000;
-    private int maxRetries = 3;
     private byte[] server = new byte[4];
-    String address;
     private String name;
     private int port = 53;
 
@@ -23,13 +20,12 @@ public class DnsClient {
         }
     }
 
-    public void makeRequest() {
+    public void makeRequest(String address) {
         try {
             System.out.println("----------------------------------------------------------------");
             System.out.println("DNS server to query " + address);
             //Create Datagram socket and request object(s)
             DatagramSocket socket = new DatagramSocket();
-            socket.setSoTimeout(timeout);
             InetAddress inetaddress = InetAddress.getByAddress(server);
             DnsRequest request = new DnsRequest(name, queryType);
 
@@ -46,8 +42,18 @@ public class DnsClient {
             socket.close();
          
             DnsResponse response = new DnsResponse(responsePacket.getData(), requestBytes.length, queryType);
-            response.outputResponse();
-            System.out.println("----------------------------------------------------------------");
+            
+            
+            AnswersAndIP aaip = response.outputResponse();
+            if (aaip.answers == 0){
+                System.out.println("----------------------------------------------------------------");
+                String[] name_and_ip = {name, aaip.IP};
+                parseInputArguments(name_and_ip);
+                makeRequest(aaip.IP);
+            }
+            else {
+                System.out.println("----------------------------------------------------------------");
+            }
         } catch (SocketException e) {
             System.out.println("ERROR\tCould not create socket");
         } catch (UnknownHostException e ) {
@@ -59,8 +65,7 @@ public class DnsClient {
 
     private void parseInputArguments(String args[]) {
         name = args[0];
-        address = args[1];
-        String[] addressComponents = address.split("\\.");
+        String[] addressComponents = args[1].split("\\.");
         for (int i = 0; i < addressComponents.length; i++) {
             int ipValue = Integer.parseInt(addressComponents[i]);
             if (ipValue < 0 || ipValue > 255) {

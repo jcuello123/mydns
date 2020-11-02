@@ -16,7 +16,7 @@ public class mydns {
     public static void main(String args[]) throws Exception {
         try {
             DnsClient client = new DnsClient(args);
-            client.makeRequest();
+            client.makeRequest(args[1]);
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }
